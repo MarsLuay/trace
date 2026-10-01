@@ -14,6 +14,7 @@
     "./graph": "./src/graph.mjs",
     "./storage": "./src/storage.mjs",
     "./context/node": "./src/context-node.mjs",
+    "./context/correlation": "./src/correlation.mjs",
     "./hooks": "./src/hooks.mjs",
     "./transform": "./src/transform.mjs",
     "./naming": "./src/naming.mjs",
