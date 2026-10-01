@@ -115,7 +115,7 @@ function expressionEnd(tokens, pairs, arrowIndex) {
     const value = tokens[index].value;
     if (["(", "[", "{"].includes(value)) depth += 1;
     else if ([")", "]", "}"].includes(value)) {
-      if (depth === 0) return index;
+      if (depth === 0) return index - 1;
       depth -= 1;
     } else if (depth === 0 && [",", ";"].includes(value)) {
       return index - 1;
@@ -351,6 +351,7 @@ export function transformSource(source, {
     for (const operation of children) {
       if (operation.start < cursor) continue;
       result += source.slice(cursor, operation.start);
+      if (operation.kind === "method") result += source.slice(operation.start, operation.bodyStart);
       result += renderOperation(operation);
       cursor = operation.end;
     }

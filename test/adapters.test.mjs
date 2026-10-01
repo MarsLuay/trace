@@ -94,4 +94,6 @@ test("instrumentation errors fail clearly and do not produce partial output", ()
     () => transformTypeScriptSource("function broken(", { ...options, fileName: "/project/src/broken.ts" }),
     (error) => error instanceof TraceBuildError && error.adapter === "typescript" && error.fileName.endsWith("broken.ts"),
   );
+  const failOpen = createViteTracePlugin({ ...options, failOpen: true });
+  assert.equal(failOpen.transform("function broken(", "/project/src/broken.ts"), null);
 });

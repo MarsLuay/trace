@@ -57,6 +57,13 @@ test("transforms supported function forms and preserves behavior", async () => {
   }
 });
 
+test("arrow expressions in object properties preserve enclosing syntax", () => {
+  const result = transformSource("const config = { callback: (value) => value + 1 };", { projectPath: "src/config.js" });
+  const hooks = createTraceHooks({ store: { append: () => {} }, idPrefix: "object-arrow" });
+  const { config } = new Function("__traceHooks", `${result.code}\nreturn { config };`)(hooks);
+  assert.equal(config.callback(2), 3);
+});
+
 test("transformed failures preserve the original error and emit fail", () => {
   const result = transformSource("function fail() { throw original; }", { projectPath: "src/fail.js" });
   const events = [];
