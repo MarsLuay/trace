@@ -352,8 +352,14 @@ export function transformSource(source, {
     for (const operation of children) {
       if (operation.start < cursor) continue;
       result += source.slice(cursor, operation.start);
-      if (operation.kind === "method") result += source.slice(operation.start, operation.bodyStart);
-      result += renderOperation(operation);
+      if (operation.kind === "function-declaration") {
+        result += source.slice(operation.start, operation.bodyInnerStart);
+        result += renderOperation(operation);
+        result += source.slice(operation.bodyInnerEnd, operation.bodyEnd);
+      } else {
+        if (operation.kind === "method") result += source.slice(operation.start, operation.bodyStart);
+        result += renderOperation(operation);
+      }
       cursor = operation.end;
     }
     return result + source.slice(cursor, end);
