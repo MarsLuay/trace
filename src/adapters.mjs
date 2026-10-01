@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { extname } from "node:path";
+
 import { createOwnership } from "./ownership.mjs";
 import { createSubsystemClassifier } from "./subsystems.mjs";
 import { transformSource } from "./transform.mjs";
@@ -89,5 +92,60 @@ export function createTypeScriptTransformer({ typescript = null, ...options } = 
     const result = transformTypeScriptSource(source, { ...options, fileName });
     if (result.skipped || !typescript?.createSourceFile) return result.skipped ? sourceFile : { ...sourceFile, text: result.code, traceMap: result.map };
     return typescript.createSourceFile(fileName, result.code, sourceFile.languageVersion, true, sourceFile.scriptKind);
+  };
+}
+
+export function transformBabelSource(source, options = {}) {
+  return transformBuildSource(source, { ...options, adapter: "babel" });
+}
+
+export function createBabelTracePlugin(options = {}) {
+  return function traceBabelPlugin(api = {}) {
+    if (typeof api.assertVersion === "function" && options.babelVersion) api.assertVersion(options.babelVersion);
+    return {
+      name: options.name ?? "trace-babel-instrumentation",
+      visitor: {
+        Program(path, state) {
+          const fileName = state?.filename ?? state?.file?.opts?.filename;
+          const source = state?.file?.code;
+          if (typeof fileName !== "string" || typeof source !== "string") return;
+          const result = transformBabelSource(source, { ...options, fileName });
+          if (state.file.metadata) state.file.metadata.trace = result;
+          if (!result.skipped && typeof options.replaceProgram === "function") options.replaceProgram(path, result.code, state);
+        },
+      },
+    };
+  };
+}
+
+export function transformSwcSource(source, options = {}) {
+  return transformBuildSource(source, { ...options, adapter: "swc" });
+}
+
+export function createSwcTracePlugin(options = {}) {
+  return {
+    name: options.name ?? "trace-swc-instrumentation",
+    transform(source, fileName) {
+      return transformSwcSource(source, { ...options, fileName });
+    },
+  };
+}
+
+function loaderFor(fileName) {
+  const extension = extname(fileName).toLowerCase();
+  return extension === ".ts" || extension === ".tsx" ? "ts" : extension === ".jsx" ? "jsx" : "js";
+}
+
+export function createEsbuildTracePlugin({ readFile: read = readFile, filter = SOURCE_EXTENSIONS, ...options } = {}) {
+  return {
+    name: options.name ?? "trace-esbuild-instrumentation",
+    setup(build) {
+      build.onLoad({ filter }, async (args) => {
+        const source = await read(args.path, "utf8");
+        const result = transformBuildSource(source, { ...options, fileName: args.path, adapter: "esbuild" });
+        if (result.skipped) return { contents: source, loader: loaderFor(args.path) };
+        return { contents: result.code, loader: loaderFor(args.path), sourcefile: args.path };
+      });
+    },
   };
 }

@@ -3,8 +3,13 @@ import test from "node:test";
 
 import {
   TraceBuildError,
+  createBabelTracePlugin,
+  createEsbuildTracePlugin,
+  createSwcTracePlugin,
   createTypeScriptTransformer,
   createViteTracePlugin,
+  transformBabelSource,
+  transformSwcSource,
   transformTypeScriptSource,
 } from "../src/adapters.mjs";
 import { createOwnership } from "../src/ownership.mjs";
@@ -44,6 +49,43 @@ test("TypeScript adapter preserves output behavior and uses shared transform sem
   assert.ok(output.text.includes("__traceHooks.invoke"));
   assert.equal(output.traceMap.file, "src/greet.ts");
   assert.equal(transformTypeScriptSource(source, { ...options, fileName: "/project/vendor/greet.ts" }).skipped, true);
+});
+
+test("Babel, SWC, and esbuild adapters share one transform and ownership boundary", async () => {
+  const shared = { ...options, fileName: "/project/src/greet.ts", runtime: "shared-runtime" };
+  const babel = transformBabelSource(source, shared);
+  const swc = transformSwcSource(source, shared);
+  const swcPlugin = createSwcTracePlugin(options);
+  const swcResult = swcPlugin.transform(source, "/project/src/greet.ts");
+  assert.equal(babel.code, swc.code);
+  assert.equal(babel.map.file, "src/greet.ts");
+  assert.equal(swcResult.code.includes("__traceHooks.invoke"), true);
+  assert.equal(transformBabelSource(source, { ...options, fileName: "/project/vendor/greet.ts" }).skipped, true);
+
+  const plugin = createBabelTracePlugin({ ...options, runtime: "shared-runtime" });
+  let replaced = null;
+  const state = {
+    filename: "/project/src/greet.ts",
+    file: { code: source, metadata: {}, opts: { filename: "/project/src/greet.ts" } },
+  };
+  plugin({}).visitor.Program({ marker: true }, state);
+  assert.ok(state.file.metadata.trace.code.includes("__traceHooks.invoke"));
+  const replacingPlugin = createBabelTracePlugin({
+    ...options,
+    replaceProgram: (_path, code) => { replaced = code; },
+  });
+  replacingPlugin({}).visitor.Program({}, state);
+  assert.ok(replaced.includes("__traceHooks.invoke"));
+
+  let onLoad = null;
+  const esbuild = createEsbuildTracePlugin({
+    ...options,
+    readFile: async () => source,
+  });
+  esbuild.setup({ onLoad: (_filter, callback) => { onLoad = callback; } });
+  const loaded = await onLoad({ path: "/project/src/greet.ts" });
+  assert.equal(loaded.loader, "ts");
+  assert.ok(loaded.contents.includes("__traceHooks.invoke"));
 });
 
 test("instrumentation errors fail clearly and do not produce partial output", () => {
