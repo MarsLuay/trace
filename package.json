@@ -15,6 +15,7 @@
     "./transform": "./src/transform.mjs",
     "./naming": "./src/naming.mjs",
     "./ownership": "./src/ownership.mjs",
-    "./subsystems": "./src/subsystems.mjs"
+    "./subsystems": "./src/subsystems.mjs",
+    "./adapters": "./src/adapters.mjs"
   }
 }

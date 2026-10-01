@@ -1,0 +1,93 @@
+import { createOwnership } from "./ownership.mjs";
+import { createSubsystemClassifier } from "./subsystems.mjs";
+import { transformSource } from "./transform.mjs";
+
+const SOURCE_EXTENSIONS = /\.(?:c?m?js|jsx|ts|tsx)$/iu;
+
+export class TraceBuildError extends Error {
+  constructor(adapter, fileName, cause) {
+    super(`${adapter} instrumentation failed for ${fileName}: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    this.name = "TraceBuildError";
+    this.adapter = adapter;
+    this.fileName = fileName;
+  }
+}
+
+function stripQuery(fileName) {
+  return fileName.split("?", 1)[0];
+}
+
+function makeBuildOptions(options, fileName, adapter) {
+  const ownership = options.ownership ?? createOwnership(options.ownershipConfig);
+  const classification = ownership.classify(stripQuery(fileName));
+  if (!classification.owned) return { ownership, classification, skipped: true };
+  const classifier = options.subsystems ?? createSubsystemClassifier(options.subsystemConfig);
+  const projectPath = classification.path;
+  try {
+    return {
+      ownership,
+      classification,
+      projectPath,
+      transform: transformSource,
+      classifier,
+      adapter,
+      options,
+    };
+  } catch (error) {
+    throw new TraceBuildError(adapter, fileName, error);
+  }
+}
+
+export function transformBuildSource(source, { fileName, adapter = "build", ...options } = {}) {
+  if (typeof source !== "string") throw new TypeError("source must be a string");
+  if (typeof fileName !== "string" || fileName.length === 0) throw new TypeError("fileName is required");
+  const build = makeBuildOptions(options, fileName, adapter);
+  if (build.skipped) return { code: source, map: null, skipped: true, ownership: build.classification };
+  try {
+    const result = transformSource(source, {
+      projectPath: build.projectPath,
+      revision: options.revision,
+      buildId: options.buildId,
+      sourceIndexId: options.sourceIndexId,
+      runtime: options.runtime ?? adapter,
+      hooksIdentifier: options.hooksIdentifier,
+      subsystem: options.subsystem ?? "unclassified",
+      subsystemForFunction: ({ functionName, source: sourceIdentity }) => build.classifier.classifySymbol({
+        projectPath: sourceIdentity.projectPath,
+        functionName,
+        runtime: options.runtime ?? adapter,
+      }).subsystem,
+    });
+    return { ...result, skipped: false, ownership: build.classification, adapter };
+  } catch (error) {
+    throw new TraceBuildError(adapter, fileName, error);
+  }
+}
+
+export function createViteTracePlugin(options = {}) {
+  return {
+    name: options.name ?? "trace-instrumentation",
+    enforce: "post",
+    transform(source, id) {
+      const fileName = stripQuery(id);
+      if (!SOURCE_EXTENSIONS.test(fileName) || fileName.endsWith(".d.ts")) return null;
+      const result = transformBuildSource(source, { ...options, fileName, adapter: "vite" });
+      if (result.skipped) return null;
+      return { code: result.code, map: result.map };
+    },
+  };
+}
+
+export function transformTypeScriptSource(source, options = {}) {
+  return transformBuildSource(source, { ...options, adapter: "typescript" });
+}
+
+export function createTypeScriptTransformer({ typescript = null, ...options } = {}) {
+  return (context) => (sourceFile) => {
+    const fileName = sourceFile.fileName ?? sourceFile.path;
+    const source = typeof sourceFile.getFullText === "function" ? sourceFile.getFullText() : sourceFile.text;
+    const result = transformTypeScriptSource(source, { ...options, fileName });
+    if (result.skipped || !typescript?.createSourceFile) return result.skipped ? sourceFile : { ...sourceFile, text: result.code, traceMap: result.map };
+    return typescript.createSourceFile(fileName, result.code, sourceFile.languageVersion, true, sourceFile.scriptKind);
+  };
+}
