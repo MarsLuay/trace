@@ -297,16 +297,17 @@ function makeMetadata(operation, options) {
     buildId: options.buildId ?? null,
     sourceIndexId: options.sourceIndexId ?? null,
   };
+  const functionName = resolveFunctionName({
+    name: operation.name,
+    className: operation.className ?? null,
+    accessor: operation.accessor ?? null,
+    projectPath: options.projectPath,
+    line: operation.line,
+    column: operation.column,
+  });
   return {
-    function: resolveFunctionName({
-      name: operation.name,
-      className: operation.className ?? null,
-      accessor: operation.accessor ?? null,
-      projectPath: options.projectPath,
-      line: operation.line,
-      column: operation.column,
-    }),
-    subsystem: options.subsystem,
+    function: functionName,
+    subsystem: options.subsystemForFunction?.({ functionName, source, operation }) ?? options.subsystem,
     language: "javascript",
     runtime: options.runtime,
     source,
@@ -326,6 +327,7 @@ export function transformSource(source, {
   buildId = null,
   sourceIndexId = null,
   subsystem = "project",
+  subsystemForFunction = null,
   runtime = "node",
   hooksIdentifier = "__traceHooks",
   shouldInstrument = () => true,
@@ -339,8 +341,8 @@ export function transformSource(source, {
   const operations = collectOperations(source).map((operation) => {
     const point = location(source, operation.start);
     return { ...operation, column: point.column };
-  }).filter((operation) => shouldInstrument(makeMetadata(operation, { projectPath, revision, buildId, sourceIndexId, subsystem, runtime })));
-  const metadataFor = (operation) => JSON.stringify(makeMetadata(operation, { projectPath, revision, buildId, sourceIndexId, subsystem, runtime }));
+  }).filter((operation) => shouldInstrument(makeMetadata(operation, { projectPath, revision, buildId, sourceIndexId, subsystem, subsystemForFunction, runtime })));
+  const metadataFor = (operation) => JSON.stringify(makeMetadata(operation, { projectPath, revision, buildId, sourceIndexId, subsystem, subsystemForFunction, runtime }));
 
   function renderRange(start, end, parent = null) {
     const children = operationChildren(operations, parent, start, end);
