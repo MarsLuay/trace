@@ -12,6 +12,7 @@
     "./storage": "./src/storage.mjs",
     "./context/node": "./src/context-node.mjs",
     "./hooks": "./src/hooks.mjs",
-    "./transform": "./src/transform.mjs"
+    "./transform": "./src/transform.mjs",
+    "./naming": "./src/naming.mjs"
   }
 }
