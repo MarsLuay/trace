@@ -16,6 +16,7 @@
     "./naming": "./src/naming.mjs",
     "./ownership": "./src/ownership.mjs",
     "./subsystems": "./src/subsystems.mjs",
-    "./index": "./src/index.mjs"
+    "./index": "./src/index.mjs",
+    "./probe": "./src/probe.mjs"
   }
 }
