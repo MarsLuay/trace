@@ -14,6 +14,7 @@
     "./hooks": "./src/hooks.mjs",
     "./transform": "./src/transform.mjs",
     "./naming": "./src/naming.mjs",
-    "./ownership": "./src/ownership.mjs"
+    "./ownership": "./src/ownership.mjs",
+    "./subsystems": "./src/subsystems.mjs"
   }
 }
