@@ -9,6 +9,7 @@
     "src",
     "python",
     "rust",
+    "go",
     "schema",
     "docs",
     "README.md",

@@ -32,6 +32,8 @@ The Python runtime adapter is distributed at `python/trace_runtime.py`. It uses 
 
 The Rust adapter is distributed under `rust/`: `trace_runtime.rs` provides the bounded JSONL runtime and `trace_macro` provides the `#[trace]` attribute. Build those crates with Cargo and install a `TraceConfig` before calling instrumented functions. The guard is automatic at each annotated function boundary and excludes vendor/generated paths.
 
+The Go adapter is distributed under `go/trace_runtime` with the source rewriter at `go/cmd/tracegen`. Run `go run ./go/cmd/tracegen -root . -write` in a consumer project, configure `trace_runtime.Config`, and pass `context.Context` through instrumented functions for parent propagation. Generated and vendor directories are excluded.
+
 Consumer subsystem and ownership configuration stays in the consuming application and is not read from package-private files.
 
 ## License
