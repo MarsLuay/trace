@@ -17,6 +17,7 @@
     "./ownership": "./src/ownership.mjs",
     "./subsystems": "./src/subsystems.mjs",
     "./adapters": "./src/adapters.mjs",
-    "./index": "./src/index.mjs"
+    "./index": "./src/index.mjs",
+    "./probe": "./src/probe.mjs"
   }
 }
