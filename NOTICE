@@ -1,0 +1,6 @@
+@marsluay/trace
+
+Copyright (c) 2026 Mars
+
+This distribution contains original project code and no vendored third-party source.
+Runtime integrations use peer/application-provided Babel, SWC, TypeScript, Vite, or esbuild APIs when configured; those dependencies retain their own licenses and notices.

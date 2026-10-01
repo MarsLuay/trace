@@ -1,2 +1,35 @@
-# trace
-A library to help AI debug large repositories
+# @marsluay/trace
+
+Privacy-preserving execution tracing for JavaScript and TypeScript applications.
+Trace records keep correlation, source identity, and control-flow metadata; they do not capture arguments, prompts, results, or credentials.
+
+## Install
+
+```sh
+npm install @marsluay/trace
+```
+
+The `trace` executable is the public query interface. It emits JSON by default:
+
+```sh
+trace past 'src/chat.mjs#start' --store .trace --index .trace/source-index.json
+trace current 'src/chat.mjs#start' --index .trace/source-index.json --runner ./trace-runner.mjs
+```
+
+Use `--format tree` for a human-readable tree. Correlation identifiers are omitted from normal output.
+
+## Entry points
+
+- `@marsluay/trace`: event contract
+- `@marsluay/trace/context/node` and `@marsluay/trace/context/browser`: runtime context adapters
+- `@marsluay/trace/context/correlation` and `@marsluay/trace/context/correlation-browser`: hidden boundary propagation
+- `@marsluay/trace/hooks` and `@marsluay/trace/hooks/browser`: fail-open tracing hooks
+- `@marsluay/trace/transform`: shared JavaScript/TypeScript transform
+- `@marsluay/trace/adapters`: Vite, TypeScript, Babel, SWC, and esbuild adapters
+- `@marsluay/trace/index`, `@marsluay/trace/storage`, and `@marsluay/trace/probe`: source indexes, bounded persistence, and probes
+
+Consumer subsystem and ownership configuration stays in the consuming application and is not read from package-private files.
+
+## License
+
+MIT. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).

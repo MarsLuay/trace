@@ -1,8 +1,24 @@
 {
   "name": "@marsluay/trace",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Privacy-preserving execution tracing for JavaScript and TypeScript applications",
+  "license": "MIT",
   "type": "module",
+  "files": [
+    "bin",
+    "src",
+    "schema",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "node --test"
   },
