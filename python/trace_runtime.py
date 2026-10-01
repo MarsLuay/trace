@@ -120,11 +120,15 @@ class TraceRuntime:
         revision: str | None = None,
         build_id: str | None = None,
         source_index_id: str | None = None,
+        sequence_start: int = 0,
+        execution_id: str | None = None,
         max_file_bytes: int = 1024 * 1024,
         max_files: int = 8,
     ) -> None:
         if not isinstance(subsystem, str) or not subsystem:
             raise TypeError("subsystem must be a non-empty string")
+        if not isinstance(sequence_start, int) or sequence_start < 0:
+            raise TypeError("sequence_start must be a non-negative integer")
         self.project_root = Path(project_root or os.getcwd()).resolve()
         roots = owned_roots or (".",)
         self.owned_roots = tuple((self.project_root / root).resolve() for root in roots)
@@ -134,8 +138,8 @@ class TraceRuntime:
         self.build_id = build_id
         self.source_index_id = source_index_id
         self.store = _BoundedStore(directory, max_file_bytes, max_files)
-        self.execution_id = _identifier("execution")
-        self.sequence = 0
+        self.execution_id = execution_id or _identifier("execution")
+        self.sequence = sequence_start
         self._frames: dict[int, tuple[dict[str, Any], contextvars.Token[dict[str, str] | None]]] = {}
         self._failed_frames: set[int] = set()
         self._decorated_codes: set[Any] = set()
