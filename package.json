@@ -8,6 +8,7 @@
     "bin",
     "src",
     "python",
+    "rust",
     "schema",
     "docs",
     "README.md",

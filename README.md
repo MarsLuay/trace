@@ -30,6 +30,8 @@ Use `--format tree` for a human-readable tree. Correlation identifiers are omitt
 
 The Python runtime adapter is distributed at `python/trace_runtime.py`. It uses `sys.settrace` for owned synchronous functions and `contextvars`-aware `TraceRuntime.trace` boundaries for async functions. Python writes the same bounded `trace-*.jsonl` records consumed by the CLI.
 
+The Rust adapter is distributed under `rust/`: `trace_runtime.rs` provides the bounded JSONL runtime and `trace_macro` provides the `#[trace]` attribute. Build those crates with Cargo and install a `TraceConfig` before calling instrumented functions. The guard is automatic at each annotated function boundary and excludes vendor/generated paths.
+
 Consumer subsystem and ownership configuration stays in the consuming application and is not read from package-private files.
 
 ## License
