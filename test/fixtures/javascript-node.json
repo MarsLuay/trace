@@ -1,0 +1,90 @@
+[
+  {
+    "schemaVersion": 1,
+    "eventId": "js-e1",
+    "executionId": "exec-js-1",
+    "invocationId": "js-i-root",
+    "parentInvocationId": null,
+    "sequence": "1",
+    "emittedAt": "2026-01-01T00:00:00.001Z",
+    "event": "enter",
+    "function": "chat.sendMessage",
+    "subsystem": "chat",
+    "language": "javascript",
+    "runtime": "node",
+    "source": {
+      "projectPath": "src/chat/send-message.js",
+      "line": 10,
+      "column": 1,
+      "revision": "git:abc123",
+      "buildId": "build:js-1",
+      "sourceIndexId": "index:js-1"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "eventId": "js-e2",
+    "executionId": "exec-js-1",
+    "invocationId": "js-i-child",
+    "parentInvocationId": "js-i-root",
+    "sequence": "2",
+    "emittedAt": "2026-01-01T00:00:00.002Z",
+    "event": "enter",
+    "function": "provider.select",
+    "subsystem": "providers",
+    "language": "javascript",
+    "runtime": "node",
+    "source": {
+      "projectPath": "src/providers/select.js",
+      "line": 4,
+      "column": 1,
+      "revision": "git:abc123",
+      "buildId": "build:js-1",
+      "sourceIndexId": "index:js-1"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "eventId": "js-e3",
+    "executionId": "exec-js-1",
+    "invocationId": "js-i-child",
+    "parentInvocationId": "js-i-root",
+    "sequence": "3",
+    "emittedAt": "2026-01-01T00:00:00.003Z",
+    "event": "exit",
+    "function": "provider.select",
+    "subsystem": "providers",
+    "language": "javascript",
+    "runtime": "node",
+    "source": {
+      "projectPath": "src/providers/select.js",
+      "line": 4,
+      "column": 1,
+      "revision": "git:abc123",
+      "buildId": "build:js-1",
+      "sourceIndexId": "index:js-1"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "eventId": "js-e4",
+    "executionId": "exec-js-1",
+    "invocationId": "js-i-root",
+    "parentInvocationId": null,
+    "sequence": "4",
+    "emittedAt": "2026-01-01T00:00:00.004Z",
+    "event": "exit",
+    "function": "chat.sendMessage",
+    "subsystem": "chat",
+    "language": "javascript",
+    "runtime": "node",
+    "source": {
+      "projectPath": "src/chat/send-message.js",
+      "line": 10,
+      "column": 1,
+      "revision": "git:abc123",
+      "buildId": "build:js-1",
+      "sourceIndexId": "index:js-1"
+    }
+  }
+]
