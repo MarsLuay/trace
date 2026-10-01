@@ -82,6 +82,31 @@ test("TypeScript adapter preserves async iteration loops", async () => {
   assert.deepEqual(events, ["collect@src/async-iteration.ts:2:5"]);
 });
 
+test("TypeScript adapter preserves reserved class method names", async () => {
+  const classSource = `
+    class ChatLifecycle {
+      async delete(chatId) {
+        return chatId;
+      }
+    }
+  `;
+  const transformed = transformTypeScriptSource(classSource, {
+    ...options,
+    fileName: "/project/src/chat-lifecycle.ts",
+  });
+  const events = [];
+  const ChatLifecycle = new Function("__traceHooks", `${transformed.code}\nreturn ChatLifecycle;`)({
+    invoke(fn, metadata, receiver, args) {
+      events.push(metadata.function);
+      return fn.apply(receiver, args);
+    },
+  });
+
+  assert.equal(await new ChatLifecycle().delete("chat-1"), "chat-1");
+  assert.equal(events.length, 1);
+  assert.match(events[0], /delete/u);
+});
+
 test("Babel, SWC, and esbuild adapters share one transform and ownership boundary", async () => {
   const shared = { ...options, fileName: "/project/src/greet.ts", runtime: "shared-runtime" };
   const babel = transformBabelSource(source, shared);

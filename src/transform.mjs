@@ -372,7 +372,7 @@ export function transformSource(source, {
     }
     if (operation.kind === "method") {
       const params = source.slice(operation.paramsStart, operation.paramsEnd);
-      const functionHeader = `${operation.isAsync ? "async " : ""}function${operation.isGenerator ? "*" : ""} ${operation.name}${params}`;
+      const functionHeader = `${operation.isAsync ? "async " : ""}function${operation.isGenerator ? "*" : ""}${params}`;
       const inner = `${functionHeader} {${renderInner(operation)}}`;
       return `{ return ${hooksIdentifier}.invoke(${inner}, ${metadata}, this, arguments); }`;
     }
