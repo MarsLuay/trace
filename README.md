@@ -28,6 +28,8 @@ Use `--format tree` for a human-readable tree. Correlation identifiers are omitt
 - `@marsluay/trace/adapters`: Vite, TypeScript, Babel, SWC, and esbuild adapters
 - `@marsluay/trace/index`, `@marsluay/trace/storage`, and `@marsluay/trace/probe`: source indexes, bounded persistence, and probes
 
+The Python runtime adapter is distributed at `python/trace_runtime.py`. It uses `sys.settrace` for owned synchronous functions and `contextvars`-aware `TraceRuntime.trace` boundaries for async functions. Python writes the same bounded `trace-*.jsonl` records consumed by the CLI.
+
 Consumer subsystem and ownership configuration stays in the consuming application and is not read from package-private files.
 
 ## License

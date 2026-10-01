@@ -7,6 +7,7 @@
   "files": [
     "bin",
     "src",
+    "python",
     "schema",
     "docs",
     "README.md",
