@@ -52,6 +52,36 @@ test("TypeScript adapter preserves output behavior and uses shared transform sem
   assert.equal(transformTypeScriptSource(source, { ...options, fileName: "/project/vendor/greet.ts" }).skipped, true);
 });
 
+test("TypeScript adapter preserves async iteration loops", async () => {
+  const asyncSource = `
+    async function collect(source) {
+      const values = [];
+      for await (const value of source) {
+        values.push(value);
+      }
+      return values;
+    }
+  `;
+  const transformed = transformTypeScriptSource(asyncSource, {
+    ...options,
+    fileName: "/project/src/async-iteration.ts",
+  });
+  const events = [];
+  const collect = new Function("__traceHooks", `${transformed.code}\nreturn collect;`)({
+    invoke(fn, metadata, receiver, args) {
+      events.push(metadata.function);
+      return fn.apply(receiver, args);
+    },
+  });
+  async function* values() {
+    yield "first";
+    yield "second";
+  }
+
+  assert.deepEqual(await collect(values()), ["first", "second"]);
+  assert.deepEqual(events, ["collect@src/async-iteration.ts:2:5"]);
+});
+
 test("Babel, SWC, and esbuild adapters share one transform and ownership boundary", async () => {
   const shared = { ...options, fileName: "/project/src/greet.ts", runtime: "shared-runtime" };
   const babel = transformBabelSource(source, shared);

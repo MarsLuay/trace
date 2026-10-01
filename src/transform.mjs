@@ -140,6 +140,7 @@ function methodInfo(tokens, openIndex) {
   const name = previous(tokens, openIndex);
   if (!name || name.type !== "identifier" || CONTROL.has(name.value)) return null;
   const beforeName = previous(tokens, openIndex - 1);
+  if (beforeName?.value === "for") return null;
   const beforeBeforeName = previous(tokens, openIndex - 2);
   const isAccessor = beforeName && ["get", "set"].includes(beforeName.value);
   const isAsync = beforeName?.value === "async" || beforeBeforeName?.value === "async";
