@@ -89,5 +89,9 @@ export function createTraceHooks({ store, clock = defaultClock, idPrefix = "trac
     return wrap(functionValue, metadata)(...args);
   }
 
-  return Object.freeze({ wrap, trace });
+  function invoke(functionValue, metadata, receiver, argsLike) {
+    return wrap(functionValue, metadata).apply(receiver, Array.from(argsLike));
+  }
+
+  return Object.freeze({ wrap, trace, invoke });
 }

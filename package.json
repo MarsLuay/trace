@@ -11,6 +11,7 @@
     "./graph": "./src/graph.mjs",
     "./storage": "./src/storage.mjs",
     "./context/node": "./src/context-node.mjs",
-    "./hooks": "./src/hooks.mjs"
+    "./hooks": "./src/hooks.mjs",
+    "./transform": "./src/transform.mjs"
   }
 }
