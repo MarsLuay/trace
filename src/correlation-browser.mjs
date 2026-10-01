@@ -1,4 +1,4 @@
-import { runWithContext } from "./context-node.mjs";
+import { activeContext, runWithContext } from "./context-browser.mjs";
 import {
   CORRELATION_HEADER,
   deserializeCorrelationContext,
@@ -7,7 +7,6 @@ import {
   serializeCorrelationContext,
 } from "./correlation-core.mjs";
 
-/** Run a receiving boundary with the propagated invocation as the hidden active parent. */
 export function runWithPropagatedContext(carrier, { header = CORRELATION_HEADER } = {}, callback, ...args) {
   if (typeof callback !== "function") throw new TypeError("callback is required");
   const parent = extractCorrelation(carrier, { header });
@@ -19,10 +18,4 @@ export function runWithPropagatedContext(carrier, { header = CORRELATION_HEADER 
   }, callback, ...args);
 }
 
-export {
-  CORRELATION_HEADER,
-  deserializeCorrelationContext,
-  extractCorrelation,
-  injectCorrelation,
-  serializeCorrelationContext,
-};
+export { activeContext, CORRELATION_HEADER, deserializeCorrelationContext, extractCorrelation, injectCorrelation, serializeCorrelationContext };
