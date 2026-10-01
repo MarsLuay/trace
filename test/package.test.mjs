@@ -51,6 +51,7 @@ test("packed artifact contains only the public package surface and runs its CLI"
     const packageJson = JSON.parse(await readFile(join(directory, "node_modules/@marsluay/trace/package.json"), "utf8"));
     assert.equal(packageJson.private, undefined);
     assert.equal(packageJson.exports["./hooks/browser"], "./src/hooks-browser.mjs");
+    assert.equal(packageJson.exports["./cli"], "./src/cli.mjs");
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

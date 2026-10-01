@@ -46,6 +46,7 @@
     "./adapters": "./src/adapters.mjs",
     "./index": "./src/index.mjs",
     "./probe": "./src/probe.mjs",
-    "./init": "./src/init.mjs"
+    "./init": "./src/init.mjs",
+    "./cli": "./src/cli.mjs"
   }
 }
