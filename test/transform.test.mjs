@@ -50,7 +50,8 @@ test("transforms supported function forms and preserves behavior", async () => {
   assert.ok(result.map.x_traceLocations.length >= 8);
   assert.ok(result.functions.some(({ kind }) => kind === "method"));
   assert.ok(result.functions.some(({ kind }) => kind === "arrow-expression"));
-  assert.ok(events.some((event) => event.function === "callback"));
+  assert.ok(events.some((event) => event.function.startsWith("callback@src/forms.js:")));
+  assert.ok(events.some((event) => event.function.startsWith("Box.method@src/forms.js:")));
   for (const executionId of new Set(events.map((event) => event.executionId))) {
     validateTrace(events.filter((event) => event.executionId === executionId), { allowIncomplete: false });
   }
@@ -64,6 +65,19 @@ test("transformed failures preserve the original error and emit fail", () => {
   const { fail } = new Function("__traceHooks", "original", `${result.code}\nreturn { fail };`)(hooks, original);
   assert.throws(() => fail(), (error) => error === original);
   assert.deepEqual(events.map((event) => event.event), ["enter", "fail"]);
+});
+
+test("source-derived names are stable and disambiguate same-named functions", () => {
+  const sourceCode = "function duplicate() { return 1; }\nfunction duplicate() { return 2; }";
+  const options = { projectPath: "src/duplicates.js" };
+  const first = transformSource(sourceCode, options);
+  const second = transformSource(sourceCode, options);
+  assert.deepEqual(first.functions, second.functions);
+  assert.equal(new Set(first.functions.map(({ name }) => name)).size, 2);
+  assert.ok(first.functions.every(({ name }) => name.startsWith("duplicate@src/duplicates.js:")));
+
+  const classResult = transformSource("class Service { get value() { return 1; } }", { projectPath: "src/service.js" });
+  assert.ok(classResult.code.includes("Service.get value@src/service.js:"));
 });
 
 test("ownership filtering can leave generated or third-party source untouched", () => {
