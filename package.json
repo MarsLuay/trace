@@ -13,6 +13,7 @@
     "./context/node": "./src/context-node.mjs",
     "./hooks": "./src/hooks.mjs",
     "./transform": "./src/transform.mjs",
-    "./naming": "./src/naming.mjs"
+    "./naming": "./src/naming.mjs",
+    "./ownership": "./src/ownership.mjs"
   }
 }
