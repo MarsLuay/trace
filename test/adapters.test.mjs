@@ -25,9 +25,10 @@ function compile(code, hooks) {
 }
 
 test("Vite adapter instruments owned source and skips non-owned modules", () => {
-  const plugin = createViteTracePlugin(options);
+  const plugin = createViteTracePlugin({ ...options, hooksPrelude: "const __traceHooks = globalThis.__traceHooks;" });
   const transformed = plugin.transform(source, "/project/src/greet.ts?import");
   assert.ok(transformed);
+  assert.ok(transformed.code.startsWith("const __traceHooks = globalThis.__traceHooks;"));
   assert.ok(transformed.code.includes("__traceHooks.invoke"));
   assert.equal(transformed.map.file, "src/greet.ts");
   assert.equal(plugin.transform(source, "/project/node_modules/pkg/index.js"), null);

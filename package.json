@@ -38,6 +38,7 @@
     "./context/correlation-browser": "./src/correlation-browser.mjs",
     "./hooks": "./src/hooks.mjs",
     "./hooks/browser": "./src/hooks-browser.mjs",
+    "./recorder/browser": "./src/recorder-browser.mjs",
     "./transform": "./src/transform.mjs",
     "./naming": "./src/naming.mjs",
     "./ownership": "./src/ownership.mjs",

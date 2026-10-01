@@ -5,6 +5,7 @@ import test from "node:test";
 import { activeContext, bindContext, runWithContext } from "../src/context-browser.mjs";
 import { injectCorrelation, runWithPropagatedContext } from "../src/correlation-browser.mjs";
 import { createBrowserTraceHooks } from "../src/hooks-browser.mjs";
+import { createBrowserTraceRecorder } from "../src/recorder-browser.mjs";
 
 const metadata = (name, subsystem = "renderer") => ({
   function: name,
@@ -43,6 +44,18 @@ test("browser promises and bound callbacks preserve renderer parentage", async (
   assert.equal(childEvents.length, 2);
   assert.deepEqual(new Set(childEvents.map((event) => event.parentInvocationId)), new Set(parentIds.map((event) => event.invocationId)));
   assert.equal(activeContext(), null);
+});
+
+test("browser recorder sends contract events and fails open", async () => {
+  const requests = [];
+  const recorder = createBrowserTraceRecorder({
+    endpoint: "/api/trace/events",
+    fetcher: async (url, init) => { requests.push({ url, init }); return { ok: true }; },
+  });
+  assert.equal(await recorder.append({ schemaVersion: 1, event: "enter" }), true);
+  assert.equal(requests[0].url, "/api/trace/events");
+  assert.equal(requests[0].init.method, "POST");
+  assert.equal(createBrowserTraceRecorder({ fetcher: null }).append({}), false);
 });
 
 test("renderer correlation joins a main execution without exposing transport details", () => {

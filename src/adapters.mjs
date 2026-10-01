@@ -76,7 +76,10 @@ export function createViteTracePlugin(options = {}) {
       if (!SOURCE_EXTENSIONS.test(fileName) || fileName.endsWith(".d.ts")) return null;
       const result = transformBuildSource(source, { ...options, fileName, adapter: "vite" });
       if (result.skipped) return null;
-      return { code: result.code, map: result.map };
+      const code = typeof options.hooksPrelude === "string" && options.hooksPrelude.length > 0
+        ? `${options.hooksPrelude}\n${result.code}`
+        : result.code;
+      return { code, map: result.map };
     },
   };
 }
