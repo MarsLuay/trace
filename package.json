@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/contract.mjs",
     "./graph": "./src/graph.mjs",
-    "./storage": "./src/storage.mjs"
+    "./storage": "./src/storage.mjs",
+    "./context/node": "./src/context-node.mjs"
   }
 }
