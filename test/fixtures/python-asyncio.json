@@ -1,0 +1,90 @@
+[
+  {
+    "schemaVersion": 1,
+    "eventId": "py-e1",
+    "executionId": "exec-py-1",
+    "invocationId": "py-i-root",
+    "parentInvocationId": null,
+    "sequence": "1",
+    "emittedAt": "2026-01-01T00:00:01.001Z",
+    "event": "enter",
+    "function": "worker.process",
+    "subsystem": "worker",
+    "language": "python",
+    "runtime": "cpython",
+    "source": {
+      "projectPath": "app/worker.py",
+      "line": 20,
+      "column": 1,
+      "revision": "git:def456",
+      "buildId": "build:py-1",
+      "sourceIndexId": "index:py-1"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "eventId": "py-e2",
+    "executionId": "exec-py-1",
+    "invocationId": "py-i-child",
+    "parentInvocationId": "py-i-root",
+    "sequence": "2",
+    "emittedAt": "2026-01-01T00:00:01.002Z",
+    "event": "enter",
+    "function": "index.search",
+    "subsystem": "index",
+    "language": "python",
+    "runtime": "cpython",
+    "source": {
+      "projectPath": "app/index.py",
+      "line": 8,
+      "column": 1,
+      "revision": "git:def456",
+      "buildId": "build:py-1",
+      "sourceIndexId": "index:py-1"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "eventId": "py-e3",
+    "executionId": "exec-py-1",
+    "invocationId": "py-i-child",
+    "parentInvocationId": "py-i-root",
+    "sequence": "3",
+    "emittedAt": "2026-01-01T00:00:01.003Z",
+    "event": "fail",
+    "function": "index.search",
+    "subsystem": "index",
+    "language": "python",
+    "runtime": "cpython",
+    "source": {
+      "projectPath": "app/index.py",
+      "line": 8,
+      "column": 1,
+      "revision": "git:def456",
+      "buildId": "build:py-1",
+      "sourceIndexId": "index:py-1"
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "eventId": "py-e4",
+    "executionId": "exec-py-1",
+    "invocationId": "py-i-root",
+    "parentInvocationId": null,
+    "sequence": "4",
+    "emittedAt": "2026-01-01T00:00:01.004Z",
+    "event": "fail",
+    "function": "worker.process",
+    "subsystem": "worker",
+    "language": "python",
+    "runtime": "cpython",
+    "source": {
+      "projectPath": "app/worker.py",
+      "line": 20,
+      "column": 1,
+      "revision": "git:def456",
+      "buildId": "build:py-1",
+      "sourceIndexId": "index:py-1"
+    }
+  }
+]
