@@ -6,6 +6,9 @@
   "scripts": {
     "test": "node --test"
   },
+  "bin": {
+    "trace": "./bin/trace.mjs"
+  },
   "exports": {
     ".": "./src/contract.mjs",
     "./graph": "./src/graph.mjs",

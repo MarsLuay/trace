@@ -91,16 +91,25 @@ export function createCurrentProbe({ index, store = null, events = [], boundarie
   async function current(target, { entryFunctions = {}, input, selectedEntry = null, direct = false } = {}) {
     observed.splice(0, observed.length);
     const resolved = lookupFunction(index, target);
-    if (resolved.status !== "found") return { status: resolved.status, target: target, candidates: resolved.candidates ?? [] };
-    const targetEntry = resolved.function;
+    let targetEntry = resolved.function;
+    let targetKind = "function";
+    if (resolved.status !== "found") {
+      const subsystemEntries = index.functions
+        .filter((entry) => entry.subsystem === target && entry.entryPoint)
+        .sort((left, right) => left.identity.localeCompare(right.identity));
+      if (subsystemEntries.length === 0) return { status: resolved.status, target, candidates: resolved.candidates ?? [] };
+      targetEntry = subsystemEntries[0];
+      targetKind = "subsystem";
+    }
     const entries = index.functions
       .filter((entry) => entry.subsystem === targetEntry.subsystem && entry.entryPoint)
       .sort((left, right) => left.identity.localeCompare(right.identity));
     if (direct) {
+      if (targetKind !== "function") return { status: "direct-function-required", target, subsystem: targetEntry.subsystem, candidates: entries.map((entry) => entry.identity) };
       const directFunction = entryFunctions[targetEntry.identity];
       if (typeof directFunction !== "function") return { status: "direct-entry-required", target: targetEntry.identity, candidates: [targetEntry.identity] };
       const selected = await wrap(targetEntry.identity, directFunction)(input);
-      return resultFor(targetEntry, selected, true);
+      return resultFor(targetEntry, selected, true, null, null, targetKind, target);
     }
     const available = entries.filter((entry) => typeof entryFunctions[entry.identity] === "function");
     let selected;
@@ -109,7 +118,7 @@ export function createCurrentProbe({ index, store = null, events = [], boundarie
     if (!selected) {
       return {
         status: available.length > 1 ? "entry-candidates" : "entry-unavailable",
-        target: targetEntry.identity,
+        target: targetKind === "subsystem" ? target : targetEntry.identity,
         subsystem: targetEntry.subsystem,
         candidates: available.map((entry) => entry.identity),
       };
@@ -121,15 +130,17 @@ export function createCurrentProbe({ index, store = null, events = [], boundarie
     } catch (caught) {
       error = { name: caught?.name ?? "Error" };
     }
-    return resultFor(targetEntry, output, false, selected.identity, error);
+    return resultFor(targetEntry, output, false, selected.identity, error, targetKind, target);
   }
 
-  function resultFor(targetEntry, output, direct, selectedEntry = null, error = null) {
-    const targetReached = observed.some((event) => event.event === "enter" && event.function === targetEntry.identity);
+  function resultFor(targetEntry, output, direct, selectedEntry = null, error = null, targetKind = "function", targetName = targetEntry.identity) {
+    const targetReached = targetKind === "subsystem"
+      ? observed.some((event) => event.event === "enter" && event.subsystem === targetEntry.subsystem)
+      : observed.some((event) => event.event === "enter" && event.function === targetEntry.identity);
     const flow = observed.length > 0 ? querySubsystem(observed, targetEntry.subsystem).root : null;
     return {
       status: error ? "failed" : "completed",
-      target: targetEntry.identity,
+      target: targetKind === "subsystem" ? targetName : targetEntry.identity,
       subsystem: targetEntry.subsystem,
       selectedEntry,
       direct,
