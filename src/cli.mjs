@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { queryFunction, querySubsystem } from "./graph.mjs";
 import { loadSourceIndex, lookupFunction, sourceDrift as indexSourceDrift } from "./index.mjs";
 import { createCurrentProbe } from "./probe.mjs";
+import { runInit } from "./init.mjs";
 import { readPersistedEvents, sourceDrift as eventSourceDrift } from "./storage.mjs";
 
 export class TraceCliError extends Error {
@@ -20,42 +21,37 @@ function optionValue(argv, index, option) {
 }
 
 export function parseCliArgs(argv) {
-  const [mode, target, ...rest] = argv;
+  const [mode, ...afterMode] = argv;
+  if (mode === "init") {
+    const options = { mode, root: process.cwd(), check: false, format: "json" };
+    for (let index = 0; index < afterMode.length; index += 1) {
+      const token = afterMode[index];
+      if (token === "--root") {
+        options.root = optionValue(afterMode, index, "--root");
+        index += 1;
+      } else if (token === "--check") options.check = true;
+      else if (token === "--format") {
+        options.format = optionValue(afterMode, index, "--format");
+        index += 1;
+      } else throw new TraceCliError(`unknown option ${token}`);
+    }
+    if (!["json", "tree"].includes(options.format)) throw new TraceCliError("--format must be json or tree");
+    return options;
+  }
+  const [target, ...rest] = afterMode;
   if (!["past", "current"].includes(mode)) throw new TraceCliError("usage: trace past|current <subsystem|function> [options]");
   if (!target || target.startsWith("--")) throw new TraceCliError("a subsystem or function target is required");
 
-  const options = {
-    mode,
-    target,
-    store: ".trace",
-    index: null,
-    runner: null,
-    format: "json",
-    direct: false,
-    selectedEntry: null,
-  };
+  const options = { mode, target, store: ".trace", index: null, runner: null, format: "json", direct: false, selectedEntry: null };
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index];
-    if (token === "--store") {
-      options.store = optionValue(rest, index, "--store");
-      index += 1;
-    } else if (token === "--index") {
-      options.index = optionValue(rest, index, "--index");
-      index += 1;
-    } else if (token === "--runner") {
-      options.runner = optionValue(rest, index, "--runner");
-      index += 1;
-    } else if (token === "--format") {
-      options.format = optionValue(rest, index, "--format");
-      index += 1;
-    } else if (token === "--entry") {
-      options.selectedEntry = optionValue(rest, index, "--entry");
-      index += 1;
-    } else if (token === "--direct") {
-      options.direct = true;
-    } else {
-      throw new TraceCliError(`unknown option ${token}`);
-    }
+    if (token === "--store") { options.store = optionValue(rest, index, "--store"); index += 1; }
+    else if (token === "--index") { options.index = optionValue(rest, index, "--index"); index += 1; }
+    else if (token === "--runner") { options.runner = optionValue(rest, index, "--runner"); index += 1; }
+    else if (token === "--format") { options.format = optionValue(rest, index, "--format"); index += 1; }
+    else if (token === "--entry") { options.selectedEntry = optionValue(rest, index, "--entry"); index += 1; }
+    else if (token === "--direct") options.direct = true;
+    else throw new TraceCliError(`unknown option ${token}`);
   }
   if (!["json", "tree"].includes(options.format)) throw new TraceCliError("--format must be json or tree");
   if (mode === "current" && !options.index) throw new TraceCliError("trace current requires --index");
@@ -175,6 +171,6 @@ export function formatResult(result, format = "json") {
 
 export async function runCli(argv) {
   const options = parseCliArgs(argv);
-  const result = options.mode === "past" ? await runPast(options) : await runCurrent(options);
+  const result = options.mode === "init" ? await runInit(options) : options.mode === "past" ? await runPast(options) : await runCurrent(options);
   return { result, format: options.format };
 }

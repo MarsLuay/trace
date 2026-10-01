@@ -16,7 +16,7 @@ trace past 'src/chat.mjs#start' --store .trace --index .trace/source-index.json
 trace current 'src/chat.mjs#start' --index .trace/source-index.json --runner ./trace-runner.mjs
 ```
 
-Use `--format tree` for a human-readable tree. Correlation identifiers are omitted from normal output.
+Use `trace init --check` to preview deterministic project setup, then `trace init` to generate `.trace/config.json` and patch a uniquely identified Vite plugin array. Ambiguous configurations return structured candidates without mutating files. Use `--format tree` for a human-readable tree. Correlation identifiers are omitted from normal output.
 
 ## Entry points
 

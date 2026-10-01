@@ -44,6 +44,7 @@
     "./subsystems": "./src/subsystems.mjs",
     "./adapters": "./src/adapters.mjs",
     "./index": "./src/index.mjs",
-    "./probe": "./src/probe.mjs"
+    "./probe": "./src/probe.mjs",
+    "./init": "./src/init.mjs"
   }
 }
