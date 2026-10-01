@@ -52,11 +52,13 @@ export class HotBuffer {
 
 export class TraceStore {
   #directory;
+  #maxPendingEvents;
   #maxFileBytes;
   #maxFiles;
   #clock;
   #onError;
   #hot;
+  #pendingEvents = 0;
   #nextFile = 0;
   #currentFile = null;
   #currentBytes = 0;
@@ -65,14 +67,17 @@ export class TraceStore {
   constructor({
     directory,
     maxMemoryEvents = 1000,
+    maxPendingEvents = maxMemoryEvents,
     maxFileBytes = 1024 * 1024,
     maxFiles = 8,
     onError = () => {},
   } = {}) {
     if (typeof directory !== "string" || directory.length === 0) throw storageError("directory is required");
+    if (!Number.isInteger(maxPendingEvents) || maxPendingEvents < 1) throw storageError("maxPendingEvents must be a positive integer");
     if (!Number.isInteger(maxFileBytes) || maxFileBytes < 256) throw storageError("maxFileBytes must be at least 256");
     if (!Number.isInteger(maxFiles) || maxFiles < 1) throw storageError("maxFiles must be a positive integer");
     this.#directory = directory;
+    this.#maxPendingEvents = maxPendingEvents;
     this.#maxFileBytes = maxFileBytes;
     this.#maxFiles = maxFiles;
     this.#onError = typeof onError === "function" ? onError : () => {};
@@ -83,7 +88,7 @@ export class TraceStore {
     return this.#hot;
   }
 
-  /** Add to memory synchronously; disk persistence is queued and never rejects to the caller. */
+  /** Add to memory synchronously; the bounded disk queue drops excess events and never rejects. */
   append(event) {
     try {
       validateEvent(event);
@@ -93,11 +98,16 @@ export class TraceStore {
       return Promise.resolve(false);
     }
 
+    if (this.#pendingEvents >= this.#maxPendingEvents) return Promise.resolve(false);
+    this.#pendingEvents += 1;
     this.#queue = this.#queue
       .then(() => this.#persist(event))
       .catch((error) => {
         this.#report(error);
         return false;
+      })
+      .finally(() => {
+        this.#pendingEvents -= 1;
       });
     return this.#queue;
   }
