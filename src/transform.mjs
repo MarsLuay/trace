@@ -1,3 +1,5 @@
+import { resolveFunctionName } from "./naming.mjs";
+
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/u;
 const CONTROL = new Set(["if", "for", "while", "switch", "catch", "with"]);
 
@@ -144,6 +146,7 @@ function methodInfo(tokens, openIndex) {
   const isGenerator = beforeName?.value === "*";
   return {
     name: name.value,
+    accessor: isAccessor ? beforeName.value : null,
     isAccessor,
     isAsync,
     isGenerator,
@@ -155,7 +158,6 @@ function collectOperations(source) {
   const pairs = pairDelimiters(tokens);
   const operations = [];
   const functionParameterOpens = new Set();
-  const functionRanges = [];
 
   for (let index = 0; index < tokens.length; index += 1) {
     if (tokens[index].value !== "function") continue;
@@ -197,7 +199,6 @@ function collectOperations(source) {
       isAsync: startIndex !== index,
     };
     operations.push(range);
-    functionRanges.push(range);
   }
 
   for (let index = 0; index < tokens.length; index += 1) {
@@ -222,6 +223,7 @@ function collectOperations(source) {
       headerStart: tokens[index].start,
       headerEnd: tokens[bodyIndex].start,
       name: info.name,
+      accessor: info.accessor,
       line: tokens[index].line,
       paramsStart: tokens[index].start,
       paramsEnd: tokens[closeIndex].end,
@@ -268,6 +270,21 @@ function collectOperations(source) {
     });
   }
 
+  const classRanges = [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (tokens[index].value !== "class") continue;
+    const nameToken = tokens[index + 1]?.type === "identifier" ? tokens[index + 1] : null;
+    let bodyIndex = index + 1;
+    while (tokens[bodyIndex] && tokens[bodyIndex].value !== "{") bodyIndex += 1;
+    const bodyEndIndex = pairs.get(bodyIndex);
+    if (tokens[bodyIndex]?.value === "{" && bodyEndIndex !== undefined) {
+      classRanges.push({ name: nameToken?.value ?? "class", start: tokens[bodyIndex].start, end: tokens[bodyEndIndex].end });
+    }
+  }
+  for (const operation of operations) {
+    const owner = classRanges.find((range) => operation.kind === "method" && operation.start > range.start && operation.end <= range.end);
+    if (owner) operation.className = owner.name;
+  }
   return operations;
 }
 
@@ -281,7 +298,14 @@ function makeMetadata(operation, options) {
     sourceIndexId: options.sourceIndexId ?? null,
   };
   return {
-    function: operation.name,
+    function: resolveFunctionName({
+      name: operation.name,
+      className: operation.className ?? null,
+      accessor: operation.accessor ?? null,
+      projectPath: options.projectPath,
+      line: operation.line,
+      column: operation.column,
+    }),
     subsystem: options.subsystem,
     language: "javascript",
     runtime: options.runtime,
@@ -372,7 +396,14 @@ export function transformSource(source, {
   }
   code += source.slice(cursor);
   const functions = operations.map((operation) => ({
-    name: operation.name,
+    name: resolveFunctionName({
+      name: operation.name,
+      className: operation.className ?? null,
+      accessor: operation.accessor ?? null,
+      projectPath,
+      line: operation.line,
+      column: operation.column,
+    }),
     kind: operation.kind,
     line: operation.line,
     column: operation.column,
