@@ -51,11 +51,51 @@ test("browser recorder sends contract events and fails open", async () => {
   const recorder = createBrowserTraceRecorder({
     endpoint: "/api/trace/events",
     fetcher: async (url, init) => { requests.push({ url, init }); return { ok: true }; },
+    maxBatchEvents: 2,
+    batchDelayMs: 60_000,
   });
-  assert.equal(await recorder.append({ schemaVersion: 1, event: "enter" }), true);
+  const first = { schemaVersion: 1, event: "enter" };
+  const second = { schemaVersion: 1, event: "exit" };
+  const firstResult = recorder.append(first);
+  const secondResult = recorder.append(second);
+  await recorder.flush();
+  assert.equal(await firstResult, true);
+  assert.equal(await secondResult, true);
   assert.equal(requests[0].url, "/api/trace/events");
   assert.equal(requests[0].init.method, "POST");
+  assert.deepEqual(JSON.parse(requests[0].init.body), { events: [first, second] });
   assert.equal(createBrowserTraceRecorder({ fetcher: null }).append({}), false);
+});
+
+test("browser recorder rejects new events before queueing when backpressured", async () => {
+  const requests = [];
+  const recorder = createBrowserTraceRecorder({
+    fetcher: async (_url, init) => { requests.push(init); return { ok: true }; },
+    maxPendingEvents: 1,
+    maxBatchEvents: 10,
+    batchDelayMs: 60_000,
+  });
+  const accepted = recorder.append({ event: "accepted" });
+  assert.equal(recorder.canAccept(), false);
+  assert.equal(recorder.append({ event: "dropped" }), false);
+  await recorder.close();
+  assert.equal(await accepted, true);
+  assert.equal(requests.length, 1);
+  assert.deepEqual(JSON.parse(requests[0].body), { events: [{ event: "accepted" }] });
+});
+
+test("browser recorder snapshots events before batching them", async () => {
+  const requests = [];
+  const recorder = createBrowserTraceRecorder({
+    fetcher: async (_url, init) => { requests.push(init); return { ok: true }; },
+    batchDelayMs: 60_000,
+  });
+  const event = { value: "before" };
+  const result = recorder.append(event);
+  event.value = "after";
+  await recorder.flush();
+  assert.equal(await result, true);
+  assert.deepEqual(JSON.parse(requests[0].body), { events: [{ value: "before" }] });
 });
 
 test("renderer correlation joins a main execution without exposing transport details", () => {

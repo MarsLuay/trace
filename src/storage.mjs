@@ -53,31 +53,43 @@ export class HotBuffer {
 export class TraceStore {
   #directory;
   #maxPendingEvents;
+  #maxBatchEvents;
+  #batchDelayMs;
   #maxFileBytes;
   #maxFiles;
-  #clock;
   #onError;
   #hot;
   #pendingEvents = 0;
+  #pending = [];
+  #flushTimer = null;
+  #flushTask = null;
+  #closed = false;
+  #initialized = false;
+  #pruneAfterWrite = false;
   #nextFile = 0;
   #currentFile = null;
   #currentBytes = 0;
-  #queue = Promise.resolve();
 
   constructor({
     directory,
     maxMemoryEvents = 1000,
     maxPendingEvents = maxMemoryEvents,
+    maxBatchEvents = 64,
+    batchDelayMs = 10,
     maxFileBytes = 1024 * 1024,
     maxFiles = 8,
     onError = () => {},
   } = {}) {
     if (typeof directory !== "string" || directory.length === 0) throw storageError("directory is required");
     if (!Number.isInteger(maxPendingEvents) || maxPendingEvents < 1) throw storageError("maxPendingEvents must be a positive integer");
+    if (!Number.isInteger(maxBatchEvents) || maxBatchEvents < 1) throw storageError("maxBatchEvents must be a positive integer");
+    if (!Number.isFinite(batchDelayMs) || batchDelayMs < 0) throw storageError("batchDelayMs must be a non-negative number");
     if (!Number.isInteger(maxFileBytes) || maxFileBytes < 256) throw storageError("maxFileBytes must be at least 256");
     if (!Number.isInteger(maxFiles) || maxFiles < 1) throw storageError("maxFiles must be a positive integer");
     this.#directory = directory;
     this.#maxPendingEvents = maxPendingEvents;
+    this.#maxBatchEvents = maxBatchEvents;
+    this.#batchDelayMs = batchDelayMs;
     this.#maxFileBytes = maxFileBytes;
     this.#maxFiles = maxFiles;
     this.#onError = typeof onError === "function" ? onError : () => {};
@@ -88,69 +100,180 @@ export class TraceStore {
     return this.#hot;
   }
 
-  /** Add to memory synchronously; the bounded disk queue drops excess events and never rejects. */
-  append(event) {
-    try {
-      validateEvent(event);
-      this.#hot.append(event);
-    } catch (error) {
-      this.#report(error);
-      return Promise.resolve(false);
-    }
+  /** Synchronous capacity check for callers that can avoid creating event data. */
+  canAccept(count = 1) {
+    return Number.isInteger(count)
+      && count > 0
+      && !this.#closed
+      && this.#pendingEvents + count <= this.#maxPendingEvents;
+  }
 
-    if (this.#pendingEvents >= this.#maxPendingEvents) return Promise.resolve(false);
-    this.#pendingEvents += 1;
-    this.#queue = this.#queue
-      .then(() => this.#persist(event))
-      .catch((error) => {
+  /** Queue one event and resolve after its batch reaches disk. */
+  append(event) {
+    return this.appendBatch([event]).then((accepted) => accepted === 1);
+  }
+
+  /** Queue a bounded event batch and resolve with the number persisted. */
+  appendBatch(events) {
+    if (!Array.isArray(events)) return Promise.resolve(0);
+    const items = [];
+    for (const event of events) {
+      if (!this.canAccept()) break;
+      let snapshot;
+      try {
+        validateEvent(event);
+        snapshot = clone(event);
+        this.#hot.append(snapshot);
+      } catch (error) {
         this.#report(error);
-        return false;
-      })
-      .finally(() => {
-        this.#pendingEvents -= 1;
+        continue;
+      }
+      this.#pendingEvents += 1;
+      items.push({
+        event: snapshot,
+        settle: null,
       });
-    return this.#queue;
+      items[items.length - 1].result = new Promise((resolve) => {
+        items[items.length - 1].settle = resolve;
+      });
+      this.#pending.push(items[items.length - 1]);
+    }
+    if (items.length === 0) return Promise.resolve(0);
+    this.#scheduleFlush();
+    return Promise.all(items.map((item) => item.result)).then((results) => results.filter(Boolean).length);
   }
 
   async flush() {
-    await this.#queue;
+    if (this.#flushTimer !== null) {
+      clearTimeout(this.#flushTimer);
+      this.#flushTimer = null;
+    }
+    while (this.#flushTask !== null || this.#pending.length > 0) {
+      if (this.#flushTask !== null) {
+        await this.#flushTask;
+      } else {
+        await this.#startFlush();
+      }
+    }
   }
 
   async close() {
+    this.#closed = true;
     await this.flush();
   }
 
-  async #persist(event) {
-    const line = `${JSON.stringify(event)}\n`;
-    const bytes = Buffer.byteLength(line);
-    if (bytes > this.#maxFileBytes) {
-      this.#report(storageError("event exceeds the configured persistence bound"));
-      return false;
-    }
-    await mkdir(this.#directory, { recursive: true });
-    if (this.#currentFile === null) {
-      const existing = (await readdir(this.#directory)).filter(isTraceFile).sort(compareFiles);
-      if (existing.length > 0) {
-        this.#currentFile = join(this.#directory, existing[existing.length - 1]);
-        this.#currentBytes = (await stat(this.#currentFile)).size;
-        const lastContent = await readFile(this.#currentFile, "utf8");
-        if (lastContent.length > 0 && !lastContent.endsWith("\n")) {
-          // Never append to a crash-truncated line: preserve it and rotate first.
-          this.#currentFile = null;
-          this.#currentBytes = 0;
-        }
-        const lastNumber = Number(existing[existing.length - 1].slice(FILE_PREFIX.length, -FILE_SUFFIX.length));
-        this.#nextFile = Number.isSafeInteger(lastNumber) ? lastNumber + 1 : existing.length;
+  #scheduleFlush() {
+    if (this.#flushTask !== null) return;
+    if (this.#pending.length >= this.#maxBatchEvents) {
+      if (this.#flushTimer !== null) {
+        clearTimeout(this.#flushTimer);
+        this.#flushTimer = null;
       }
+      void this.#startFlush();
+      return;
     }
-    if (this.#currentFile === null || this.#currentBytes + bytes > this.#maxFileBytes) {
-      this.#currentFile = join(this.#directory, fileName(this.#nextFile++));
+    if (this.#flushTimer !== null) return;
+    this.#flushTimer = setTimeout(() => {
+      this.#flushTimer = null;
+      void this.#startFlush();
+    }, this.#batchDelayMs);
+  }
+
+  #startFlush() {
+    if (this.#flushTask !== null) return this.#flushTask;
+    if (this.#flushTimer !== null) {
+      clearTimeout(this.#flushTimer);
+      this.#flushTimer = null;
+    }
+    const batch = this.#pending.splice(0, this.#maxBatchEvents);
+    if (batch.length === 0) return Promise.resolve();
+    this.#flushTask = this.#persistBatch(batch)
+      .then((results) => {
+        for (let index = 0; index < batch.length; index += 1) {
+          batch[index].settle(results[index] === true);
+          this.#pendingEvents -= 1;
+        }
+      })
+      .catch((error) => {
+        this.#report(error);
+        for (const item of batch) {
+          item.settle(false);
+          this.#pendingEvents -= 1;
+        }
+      })
+      .finally(() => {
+        this.#flushTask = null;
+        if (this.#pending.length > 0) this.#scheduleFlush();
+      });
+    return this.#flushTask;
+  }
+
+  async #initialize() {
+    if (this.#initialized) return;
+    await mkdir(this.#directory, { recursive: true });
+    const existing = (await readdir(this.#directory)).filter(isTraceFile).sort(compareFiles);
+    this.#initialized = true;
+    if (existing.length === 0) return;
+
+    const last = existing[existing.length - 1];
+    this.#currentFile = join(this.#directory, last);
+    this.#currentBytes = (await stat(this.#currentFile)).size;
+    const lastContent = await readFile(this.#currentFile, "utf8");
+    const lastNumber = Number(last.slice(FILE_PREFIX.length, -FILE_SUFFIX.length));
+    this.#nextFile = Number.isSafeInteger(lastNumber) ? lastNumber + 1 : existing.length;
+    if (lastContent.length > 0 && !lastContent.endsWith("\n")) {
+      // Preserve crash-truncated data and start a clean file before appending.
+      this.#currentFile = null;
       this.#currentBytes = 0;
+      this.#pruneAfterWrite = true;
     }
-    await appendFile(this.#currentFile, line, "utf8");
-    this.#currentBytes += bytes;
-    await this.#prune();
-    return true;
+  }
+
+  async #persistBatch(items) {
+    const results = new Array(items.length).fill(false);
+    await this.#initialize();
+    let chunk = [];
+    let chunkBytes = 0;
+
+    const writeChunk = async () => {
+      if (chunk.length === 0) return;
+      const file = this.#currentFile ?? this.#newFile();
+      await appendFile(file, chunk.map((entry) => entry.line).join(""), "utf8");
+      this.#currentBytes += chunkBytes;
+      for (const entry of chunk) results[entry.index] = true;
+      chunk = [];
+      chunkBytes = 0;
+      if (this.#pruneAfterWrite) {
+        await this.#prune();
+        this.#pruneAfterWrite = false;
+      }
+    };
+
+    for (let index = 0; index < items.length; index += 1) {
+      const line = JSON.stringify(items[index].event) + "\n";
+      const bytes = Buffer.byteLength(line);
+      if (bytes > this.#maxFileBytes) {
+        this.#report(storageError("event exceeds the configured persistence bound"));
+        continue;
+      }
+      if (this.#currentFile === null) this.#newFile();
+      if (this.#currentBytes + chunkBytes + bytes > this.#maxFileBytes) {
+        await writeChunk();
+        this.#newFile();
+      }
+      chunk.push({ index, line });
+      chunkBytes += bytes;
+    }
+    await writeChunk();
+    return results;
+  }
+
+  #newFile() {
+    const isRotation = this.#currentFile !== null || this.#pruneAfterWrite;
+    this.#currentFile = join(this.#directory, fileName(this.#nextFile++));
+    this.#currentBytes = 0;
+    this.#pruneAfterWrite = isRotation;
+    return this.#currentFile;
   }
 
   async #prune() {

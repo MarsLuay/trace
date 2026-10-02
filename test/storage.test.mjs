@@ -66,6 +66,59 @@ test("rotation and pruning keep disk retention bounded", async () => {
   }
 });
 
+test("retention pruning runs only when a new file is rotated into", async () => {
+  const event = (await fixture("javascript-node.json")).default[0];
+  const { directory } = await temporaryStore();
+  const line = JSON.stringify(event) + "\n";
+  const lineBytes = Buffer.byteLength(line);
+  for (let index = 0; index < 3; index += 1) {
+    await writeFile(join(directory, `trace-${String(index).padStart(12, "0")}.jsonl`), line, "utf8");
+  }
+  const store = new TraceStore({ directory, maxFileBytes: lineBytes * 3, maxFiles: 1 });
+  try {
+    await store.append(event);
+    await store.append(event);
+    assert.equal((await readdir(directory)).filter((name) => name.endsWith(".jsonl")).length, 3);
+    await store.append(event);
+    assert.equal((await readdir(directory)).filter((name) => name.endsWith(".jsonl")).length, 1);
+  } finally {
+    await removeStoreDirectory(directory);
+  }
+});
+
+test("appendBatch persists a batch and backpressure is checked before validation", async () => {
+  const events = (await fixture("javascript-node.json")).default;
+  const { directory } = await temporaryStore();
+  const store = new TraceStore({ directory, maxPendingEvents: 16, maxBatchEvents: 16, batchDelayMs: 60_000 });
+  const errors = [];
+  const pressured = new TraceStore({
+    directory: join(directory, "pressure"),
+    maxPendingEvents: 1,
+    maxBatchEvents: 16,
+    batchDelayMs: 60_000,
+    onError: (error) => errors.push(error),
+  });
+  try {
+    const batch = store.appendBatch(events);
+    await store.flush();
+    assert.equal(await batch, events.length);
+    const pending = pressured.append(events[0]);
+    assert.equal(pressured.canAccept(), false);
+    assert.equal(pressured.canAccept(2), false);
+    assert.equal(await pressured.append({ invalid: true }), false);
+    assert.equal(errors.length, 0);
+    await pressured.flush();
+    assert.equal(await pending, true);
+    assert.equal(pressured.canAccept(), true);
+    const persisted = await readPersistedEvents(directory);
+    assert.deepEqual(persisted.events.map((event) => event.eventId), events.map((event) => event.eventId));
+  } finally {
+    await store.close();
+    await pressured.close();
+    await removeStoreDirectory(directory);
+  }
+});
+
 test("storage failures fail open without changing consumer behavior", async () => {
   const events = (await fixture("javascript-node.json")).default;
   const parent = await mkdtemp(join(tmpdir(), "trace-store-failure-"));

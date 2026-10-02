@@ -18,6 +18,8 @@ trace current 'src/chat.mjs#start' --index .trace/source-index.json --runner ./t
 
 Use `trace init --check` to preview deterministic project setup, then `trace init` to generate `.trace/config.json` and patch a uniquely identified Vite plugin array. Ambiguous configurations return structured candidates without mutating files. Use `--format tree` for a human-readable tree. Correlation identifiers are omitted from normal output.
 
+Runtime hooks accept `enabled` and `subsystems` options. Existing callers stay enabled when they omit these options; `subsystems: []` records no subsystem, and `configure({ enabled, subsystems })` updates already-created wrappers. Hooks check a recorder's synchronous `canAccept()` before creating context or event data. `TraceStore` batches up to 64 events or 10 ms by default and prunes old files only after rotating to a new file. The browser recorder batches up to 32 events or 10 ms into one request. Both queues are bounded and fail open. Applications that need durable settings should persist them at the integration layer; the Dashboard stores its default-off global switch and selected subsystems locally in `.trace/settings.json`.
+
 ## Entry points
 
 - `@marsluay/trace`: event contract

@@ -3,6 +3,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 
 import { createTraceHooks } from "../src/hooks.mjs";
+import { createTraceHooksWithContext } from "../src/hooks-core.mjs";
 import { validateTrace } from "../src/contract.mjs";
 
 const metadata = (functionName, subsystem = "tests") => ({
@@ -106,4 +107,45 @@ test("recorder failures fail open and do not alter application behavior", async 
   }, metadata("open.return"));
   assert.equal(await wrapped("unchanged"), "unchanged");
   assert.equal(events.length, 2);
+});
+
+test("disabled and backpressured hooks bypass event construction and context creation", () => {
+  let contextCalls = 0;
+  const store = {
+    canAccept: () => false,
+    append: () => assert.fail("backpressured hooks must not append"),
+  };
+  const contextRuntime = {
+    activeContext() { contextCalls += 1; return null; },
+    createContext() { contextCalls += 1; return {}; },
+    runWithContext(_context, callback) { contextCalls += 1; return callback(); },
+  };
+  const hooks = createTraceHooksWithContext({ store, contextRuntime, enabled: true });
+  const dangerousMetadata = {};
+  Object.defineProperty(dangerousMetadata, "subsystem", {
+    get() { assert.fail("backpressure must be checked before reading metadata"); },
+  });
+  assert.equal(hooks.wrap(() => "unchanged", dangerousMetadata)(), "unchanged");
+  assert.equal(contextCalls, 0);
+
+  const events = [];
+  const disabled = createTraceHooks({ store: recordingStore(events), enabled: false });
+  assert.equal(disabled.wrap(() => "still runs", metadata("disabled"))(), "still runs");
+  assert.equal(events.length, 0);
+});
+
+test("runtime configuration records only selected subsystems and can switch off", () => {
+  const events = [];
+  const hooks = createTraceHooks({ store: recordingStore(events), enabled: false, subsystems: [] });
+  const browser = hooks.wrap(() => "browser", metadata("renderer", "browser"));
+  const tools = hooks.wrap(() => "tools", metadata("tool", "tools"));
+
+  assert.equal(browser(), "browser");
+  hooks.configure({ enabled: true, subsystems: ["browser"] });
+  assert.equal(tools(), "tools");
+  assert.equal(browser(), "browser");
+  hooks.configure({ enabled: false });
+  assert.equal(browser(), "browser");
+  assert.deepEqual(events.map((event) => event.subsystem), ["browser", "browser"]);
+  assert.deepEqual(events.map((event) => event.event), ["enter", "exit"]);
 });
